@@ -48,7 +48,7 @@ void print_hex(int v, int num_places) {
 void read_chars(int ct, char buf[], int *idx, int limit) {
   char c;
   int  x=0;
-  int idxval = *idx;
+  int  idxval = *idx;
   while (x < ct) {
     if (Serial.available()) {
       c = Serial.read();
@@ -61,7 +61,7 @@ void read_chars(int ct, char buf[], int *idx, int limit) {
         *idx = idxval;
         return;
       }
-      buf[ idxval ] = c;
+      buf[idxval] = c;
       idxval++;
       x++;
     }
@@ -71,8 +71,8 @@ void read_chars(int ct, char buf[], int *idx, int limit) {
 
 void read_chars_dyn(char buf[], int *idx, int limit) {
   char c;
-  int  ct = 1;
   int  x=0;
+  int  ct = 1;
   int  idxval = *idx;
 
   while (!Serial.available()) {
@@ -80,10 +80,9 @@ void read_chars_dyn(char buf[], int *idx, int limit) {
   }
 
   c = Serial.read();
-  buf[ idxval ] = c;
+  ct = (int) c;
+  buf[idxval] = c;
   idxval++;
-
-  ct = (int)c;
 
   while (x < ct) {
     if (Serial.available()) {
@@ -95,7 +94,7 @@ void read_chars_dyn(char buf[], int *idx, int limit) {
         *idx = idxval;
         return;
       }
-      buf[ idxval ] = c;
+      buf[idxval] = c;
       idxval++;
       x++;
     }
@@ -104,6 +103,14 @@ void read_chars_dyn(char buf[], int *idx, int limit) {
 }
 
 void on_status(char cbuf[], int *idx) {
+  //F2 messages with less than 16 bytes don't seem to have
+  // any important information
+  if (19 > (int) cbuf[1]) {
+    memset(cbuf, 0, sizeof(cbuf));
+    *idx = 0;
+    return;
+  }
+
   radio.println("BEGIN_STATUS");
 
   radio.print("STATUS_HEADERS: ");
@@ -114,7 +121,7 @@ void on_status(char cbuf[], int *idx) {
   radio.println();
 
   //7th byte is incremental counter
-  radio.print("STATUS_COUNT: ");
+  radio.print("STATUS_LENGTH: ");
   print_hex(cbuf[7], 8);
   radio.println();
 
@@ -125,19 +132,11 @@ void on_status(char cbuf[], int *idx) {
   }
   radio.println();
 
-  //F2 messages with less than 16 bytes don't seem to have
-  // any important information
-  if (19 > (int) cbuf[1]) {
-    memset(cbuf, 0, sizeof(cbuf));
-    *idx = 0;
-    return;
-  }
-
   //19th spot is 01 for disarmed, 02 for armed
   //short armed = (0x02 & cbuf[19]) && !(cbuf[19] & 0x01);
   short armed = 0x02 & cbuf[19];
 
-  //20th spot is away / stay
+  // 20th spot is away / stay
   // this bit is really confusing
   // it clearly switches to 2 when you set away mode
   // but it is also 0x02 when an alarm is canceled,
@@ -305,6 +304,7 @@ void loop() {
     guibuf[guidx] = x; guidx++;
     read_chars(msg_len_status - 1, guibuf, &guidx, 100);
     on_display(guibuf, &guidx);
+    radio.println();
     return;
   }
 
@@ -312,6 +312,7 @@ void loop() {
     gcbuf[gidx] = x; gidx++;
     read_chars_dyn(gcbuf, &gidx, 30);
     on_status(gcbuf, &gidx);
+    radio.println();
     return;
   }
 }
